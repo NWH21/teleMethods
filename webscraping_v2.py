@@ -4,7 +4,7 @@ from csv import writer
 
 
 
-url = "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Optional.html"
+url = "https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Optional.html" ##(URL for desired API)
 page = requests.get(url)
 
 soup = BeautifulSoup(page.content, 'html.parser')
