@@ -18,7 +18,7 @@ with open ('Optional.csv', 'w', encoding = 'utf8', newline = '') as f:
     n = 0
     methods = methods.find_all("tr", id=lambda value: value and value.startswith("i"))
     for method in methods:
-        ids = "i" + str(n)
+        ids = "i" + str(n)  ##desired identity name
     
         method_modifier = method.find("td", class_ = "colFirst").text
         method_name = method.find("span", class_ = "memberNameLink").text
