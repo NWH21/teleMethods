@@ -79,3 +79,4 @@ def whichMethod(call):
         break
     
 
+bot.polling()
