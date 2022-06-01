@@ -1,0 +1,18 @@
+do
+$$
+declare
+  tname record;
+begin
+  for tname in select t.table_schema, t.table_name
+               from information_schema.tables t
+               where table_schema = 'public' --<< change schema name here
+                 and not exists (select * 
+                                 from information_schema.columns c
+                                 where (c.table_schema, c.table_name) = (t.table_schema, t.table_name)
+                                   and c.column_name = 'package') 
+  loop
+    -- change column definition in the following string
+    execute format('alter table %I.%I add column package text add foreign key ("package") references "API"(name) CONSTRAINT constraint_name DEFAULT default_value', tname.table_schema, tname.table_name);
+  end loop;
+end;
+$$
