@@ -1,5 +1,0 @@
-
-pyTelegramBotAPI==4.5.1
-
-supabase==0.5.6
-
