@@ -4,14 +4,12 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client, Client
 
-url = "https://sjawprrqxzopnpuoscxx.supabase.co"
-key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqYXdwcnJxeHpvcG5wdW9zY3h4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY1MzM5NDY5NSwiZXhwIjoxOTY4OTcwNjk1fQ.-O7paWKScqX3PynQUPk9zaWda-2AG4WyuSU8fYxK9M8"
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY_SECRET")
 supabase: Client = create_client(url, key)
 
-
-API_KEY = "5337128385:AAHIaR0hZHHXVGUCsWE43xGGedSUURSDRMM"
+API_KEY = os.environ['API_KEY']
 bot = telebot.TeleBot(API_KEY)
-
 
 bot.delete_my_commands(scope=None, language_code=None)
 
@@ -30,7 +28,6 @@ def keyboardForClasses():
   button4 = InlineKeyboardButton(text="...", callback_data="...")
   keyboard_inline = InlineKeyboardMarkup().add(button1, button2, button3, button4)
   return keyboard_inline
-
 
 
 def isPackage(call):
@@ -52,9 +49,6 @@ def isMethod(call):
 @bot.message_handler(commands=['packages'])
 def whichPackage(message):
   bot.send_message(message.chat.id, "Which package?",reply_markup = keyboardForPackages())
-
-
-
 
 
 @bot.callback_query_handler(func= isPackage)
