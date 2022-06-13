@@ -1,66 +1,82 @@
 import os
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client, Client
 
 url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+key: str = os.environ.get("SUPABASE_KEY_SECRET")
 supabase: Client = create_client(url, key)
-
 
 API_KEY = os.environ['API_KEY']
 bot = telebot.TeleBot(API_KEY)
 
-
-data = supabase.table("Optional").select("*").execute()
-print(data)
-
-
-##Create##
-# supabase.table("Optional").insert({"ID":"...", ......}).execute()
-
-
-##Read##
-# supabase.table("Optional").select("*").execute()
-
-
-##Update##
-# supabase.table("Optional").update({"ID": "...", "Method Modifier and Type": "...", "Method Name": "...", "Method Description": "..."}).eq("id", 1).execute()
-
-
-##Delete##
-# supabase.table("Optional").delete().eq("id", 1).execute()
-
-##Assert##
-# assert len(data.data) > 0
-
-
-
 bot.delete_my_commands(scope=None, language_code=None)
 
-def keyboard1():
-  markup = ReplyKeyboardMarkup(row_width=10, one_time_keyboard = True)
-  markup.add("java.util")
-  markup.add("java.lang")
-  markup.add("java.math")
-  markup.add("...")
-  return markup
+def keyboardForPackages():
+  button1 = InlineKeyboardButton(text="java.util", callback_data="java.util")
+  button2 = InlineKeyboardButton(text="java.lang", callback_data="java.lang")
+  button3 = InlineKeyboardButton(text="java.math", callback_data="java.math")
+  button4 = InlineKeyboardButton(text="...", callback_data="...")
+  keyboard_inline = InlineKeyboardMarkup().add(button1, button2, button3, button4)
+  return keyboard_inline
+
+def keyboardForClasses():
+  button1 = InlineKeyboardButton(text="Optional", callback_data="Optional")
+  button2 = InlineKeyboardButton(text="Collections", callback_data="Collections")
+  button3 = InlineKeyboardButton(text="Set", callback_data="Set")
+  button4 = InlineKeyboardButton(text="...", callback_data="...")
+  keyboard_inline = InlineKeyboardMarkup().add(button1, button2, button3, button4)
+  return keyboard_inline
+
+
+def isPackage(call):
+  if "java." in call.data:
+    return True
+  return False
+
+def isClass(call):
+  string = call.data
+  if string[0].isupper():
+    return True
+  return False
+
+def isMethod(call):
+  return not isPackage(call) and not isClass(call)
+
+
 
 @bot.message_handler(commands=['packages'])
-def packages(message):
-  bot.send_message(message.chat.id, "Which package?",reply_markup = keyboard1())
+def whichPackage(message):
+  bot.send_message(message.chat.id, "Which package?",reply_markup = keyboardForPackages())
 
 
-@bot.message_handler(func=lambda message:True)
-def classes(message):
-  if message.text == "java.util":
-    response = "Which class?" + "\n" + "/Optional" + "\n" + "/Collections" + "\n" + "/Set" + "\n" + "etc"
-    bot.send_message(message.chat.id, response)
-  elif message.text == "/Optional":
-    response = "Which method?" + "\n" + "/ifElse" + "\n" + "/isEmpty" + "\n" + "/isPresent" + "\n" + "etc"
-    bot.send_message(message.chat.id, response)
-  elif message.text == "/isEmpty":
-    response = "isEmpty() returns true if value is present otherwise returns false"
-    bot.send_message(message.chat.id, response)
-  
+@bot.callback_query_handler(func= isPackage)
+def whichClass(call):
+  if call.data == "java.util":
+    bot.send_message(call.message.chat.id, "Which class?", reply_markup = keyboardForClasses())
+
+
+@bot.callback_query_handler(func= isClass)
+def whichMethod(call):
+  data1 = supabase.table(call.data)
+  data2 = supabase.table(call.data).select("*").execute().data
+  def keyboardForMethods():
+    keyboard_inline = InlineKeyboardMarkup()
+    for dict in data2:
+      method_name = dict.get("Method Name")
+      keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = method_name, callback_data = method_name ))
+    return keyboard_inline  
+  bot.send_message(call.message.chat.id, "Which method?", reply_markup = keyboardForMethods()) 
+
+  @bot.callback_query_handler(func= isMethod)
+  def methodDescription(call):
+    data = data1.select('*').execute().data
+    for methods in data:
+      if methods.get("Method Name") == call.data:
+        msg = methods.get("Method Description")
+        bot.send_message(call.message.chat.id, msg)
+        break
+    
+
 bot.polling()
