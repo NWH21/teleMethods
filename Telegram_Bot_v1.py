@@ -1,9 +1,39 @@
 import os
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from supabase import create_client, Client
+
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+
 
 API_KEY = os.environ['API_KEY']
 bot = telebot.TeleBot(API_KEY)
+
+
+data = supabase.table("Optional").select("*").execute()
+print(data)
+
+
+##Create##
+# supabase.table("Optional").insert({"ID":"...", ......}).execute()
+
+
+##Read##
+# supabase.table("Optional").select("*").execute()
+
+
+##Update##
+# supabase.table("Optional").update({"ID": "...", "Method Modifier and Type": "...", "Method Name": "...", "Method Description": "..."}).eq("id", 1).execute()
+
+
+##Delete##
+# supabase.table("Optional").delete().eq("id", 1).execute()
+
+##Assert##
+# assert len(data.data) > 0
+
 
 
 bot.delete_my_commands(scope=None, language_code=None)
