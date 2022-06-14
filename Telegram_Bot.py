@@ -13,9 +13,11 @@ API_KEY = os.environ['API_KEY']
 bot = telebot.TeleBot(API_KEY)
 bot.delete_my_commands(scope=None, language_code=None)
 
+
 #########################
 ### CALLBACK CHECKERS ###
 #########################
+
 
 def isPackage(call):
   if "java." in call.data or "javax." in call.data:
@@ -121,6 +123,7 @@ def whichPackage(message):
 @bot.callback_query_handler(func= isPackage)
 def whichClass(call):
   classname = call.data
+
   bot.delete_message (call.message.chat.id, call.message.id)
   bot.send_message(call.message.chat.id, "Which class?", reply_markup = keyboardForClasses())
   
@@ -128,9 +131,11 @@ def whichClass(call):
   def whichMethod(call):
     posts = db[classname]
     post = posts.find_one({"classname" : call.data})
+
     bot.delete_message (call.message.chat.id, call.message.id)
     bot.send_message(call.message.chat.id, "Which method?", reply_markup = keyboardForMethods(post))
     
+
     @bot.callback_query_handler(func= isMethod)
     def methodDescription(call):
       methods = post["classmethods"]
@@ -181,6 +186,7 @@ def displayBookmarkedMethod(call):
       msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description
       bot.send_message(call.message.chat.id, msg)
       
+
 
 
 bot.polling()
