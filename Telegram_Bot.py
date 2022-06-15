@@ -110,8 +110,8 @@ def keyboardForSearchingBookmarks(id):
         
 def keyboardForRemovingBookmarks(bookmarked_method):  
   keyboard_inline = InlineKeyboardMarkup()
-  keyboard_inline.add(InlineKeyboardButton(text = "Back to Bookmarks",callback_data = "display all bookmarks " + bookmarked_method))
   keyboard_inline.add(InlineKeyboardButton(text = "Remove Bookmark",callback_data = "removing bookmark " + bookmarked_method))
+  keyboard_inline.add(InlineKeyboardButton(text = "Back to Bookmarks",callback_data = "display all bookmarks " + bookmarked_method))
   return keyboard_inline   
 
   
