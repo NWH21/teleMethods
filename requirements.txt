@@ -1,4 +1,4 @@
 
 pyTelegramBotAPI==4.6.0
-telebot==0.0.4
+dnspython==2.2.1
 pymongo==4.1.1
