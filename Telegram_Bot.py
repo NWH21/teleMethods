@@ -9,10 +9,10 @@ import re
 client = pymongo.MongoClient("mongodb+srv://kkennyllow:Something1.@cluster0.nmjspdx.mongodb.net/teleMethods?retryWrites=true&w=majority")
 db = client["teleMethods"]
 
-'API_KEY' = 5424123226:AAG2yTG5kdgMwfk6vyOMr7DYQ3fTkMhNFbs
-API_KEY = os.environ['API_KEY']
+API_KEY = 5424123226:AAG2yTG5kdgMwfk6vyOMr7DYQ3fTkMhNFbs
 bot = telebot.TeleBot(API_KEY)
 bot.delete_my_commands(scope=None, language_code=None)
+
 
 #########################
 ### CALLBACK CHECKERS ###
