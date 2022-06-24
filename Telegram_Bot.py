@@ -9,10 +9,9 @@ import re
 client = pymongo.MongoClient("mongodb+srv://kkennyllow:Something1.@cluster0.nmjspdx.mongodb.net/teleMethods?retryWrites=true&w=majority")
 db = client["teleMethods"]
 
-API_KEY = 5424123226:AAG2yTG5kdgMwfk6vyOMr7DYQ3fTkMhNFbs
+API_KEY = "5424123226:AAG2yTG5kdgMwfk6vyOMr7DYQ3fTkMhNFbs"
 bot = telebot.TeleBot(API_KEY)
 bot.delete_my_commands(scope=None, language_code=None)
-
 
 #########################
 ### CALLBACK CHECKERS ###
@@ -43,19 +42,6 @@ def isRemoveBookmark(call):
 def isReturnToBookmarks(call):
   return isBookmark(call) and "display all bookmarks " in call.data
 
-def isQuickSearch(message):
-  text = message.text.split(".")
-  if len(message.text.split(".")) < 3 or len(text[-1].split()) < 2:
-    return False
-  package = message.text.replace("." + text[-1],"")
-  classname = text[-1].split()[0]
-  method = text[-1].split()[1]
-  if package in db.list_collection_names():
-    class_ = db[package].find_one({"classname" : classname})
-    for methods in class_["classmethods"]:
-      if re.sub("\([^()]*\)", "", method) == re.sub("\([^()]*\)", "", methods["method_name"]):
-        return True
-  return False
   
 #################
 ### KEYBOARDS ###
@@ -127,28 +113,6 @@ def keyboardForRemovingBookmarks(bookmarked_method):
   keyboard_inline.add(InlineKeyboardButton(text = "Remove Bookmark",callback_data = "removing bookmark " + bookmarked_method))
   keyboard_inline.add(InlineKeyboardButton(text = "Back to Bookmarks",callback_data = "display all bookmarks " + bookmarked_method))
   return keyboard_inline   
-
-def keyboardForQuickSearchMethods(post, method):
-  keyboard_inline = InlineKeyboardMarkup()
-  list_id = []
-  list = []
-  for methods in post["classmethods"]:
-    methodname = methods["method_name"]
-    methodname = re.sub("\([^()]*\)", "", methodname)
-    if methodname == method:
-      list_id.append(methods["ID"]) 
-      list.append(methodname)
-  if len(list) == 0:
-    keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = "No methods", callback_data =None))
-  else:
-    for i in range(len(list)):
-      if i % 2 == 0 and i != len(list) - 1: 
-        keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]),                                                                   InlineKeyboardButton(text = list[i+1], callback_data = list_id[i+1]))
-      elif i % 2 == 0 and i == len(list) - 1:
-        keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]))
-      else:
-        continue
-  return keyboard_inline  
 
   
 #########################
@@ -241,48 +205,4 @@ def returnToBookmarks(call):
   bot.delete_message (call.message.chat.id, call.message.id)
   return bookmarks(call.message)
 
-
-####################
-### QUICK SEARCH ###
-####################
-  
-@bot.message_handler(commands = ['quick'])
-def quickSearch(message):
-  bot.send_message(message.chat.id, "What are you searching for?")
-
-  
-@bot.message_handler(func = isQuickSearch)
-def displayQuickSearchMethod(message):
-  text = message.text.split(".")
-  package = message.text.replace("." + text[-1],"")
-  classname = text[-1].split()[0]
-  method = text[-1].split()[1]
-  class_ = db[package].find_one({"classname" : classname})
-  bot.send_message(message.chat.id, "Which method?", reply_markup = keyboardForQuickSearchMethods(class_, re.sub("\([^()]*\)", "", method)))
-    
-  @bot.callback_query_handler(func= isMethod)
-  def methodDescription(call): 
-    for methods in class_["classmethods"]:
-      if methods["ID"] == call.data:
-        name = methods["method_name"]
-        type = methods["method_modifier"]
-        description = methods["method_description"].replace("\n", "")
-        msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description
-        bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
-  
-    @bot.callback_query_handler(func = isAddBookmark)
-    def addBookmark(call):
-      users = db["Bookmark"]
-      if users.find_one({'chat_id' : call.message.chat.id}) != None:
-        existing = users.find_one({'chat_id' : call.message.chat.id})
-        existing = existing["Bookmarked_methods"] 
-      else:
-        existing = []  
-      existing.append({"method_name":name,"method_modifier": type, "method_description": description})
-      users.update_one({'chat_id': call.message.chat.id},{'$set': {"Bookmarked_methods":existing}}, upsert=True)
-      text = "Bookmark added!"
-      bot.send_message(call.message.chat.id,text)  
-
-
 bot.polling()
-
