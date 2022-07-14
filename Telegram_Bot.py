@@ -1,4 +1,4 @@
-import os
+import os,requests,json
 import telebot
 import pymongo
 from pymongo import MongoClient
@@ -6,12 +6,44 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import re
 
+
+
 client = pymongo.MongoClient("mongodb+srv://kkennyllow:Something1.@cluster0.nmjspdx.mongodb.net/teleMethods?retryWrites=true&w=majority")
 db = client["teleMethods"]
-
 API_KEY = "5424123226:AAG2yTG5kdgMwfk6vyOMr7DYQ3fTkMhNFbs"
+
 bot = telebot.TeleBot(API_KEY)
 bot.delete_my_commands(scope=None, language_code=None)
+
+
+
+
+#########################
+######### MENU ##########
+#########################
+url = "https://api.telegram.org/bot"+API_KEY+"/setMyCommands?commands="
+cmd = [{
+  "command":"packages",
+  "description": "shows the various packages for selection"
+  },
+  { "command" : "bookmarks",
+    "description": "shows your bookmarked methods"
+  },
+  { "command" :"quick",
+    "description" : "performs quick search"
+  },
+  { "command" :"upvote",
+    "description" : "gives top 10 most upvoted methods by other users"
+    }]
+cmd = json.dumps(cmd)
+url = url + str(cmd)
+response = requests.get(url)
+
+
+
+
+
+
 
 #########################
 ### CALLBACK CHECKERS ###
@@ -79,7 +111,7 @@ def keyboardForClasses(classname):
       list.append(post["classname"])
     for i in range(len(list)):
       if i % 2 == 0 and i != len(list) - 1: 
-        keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list[i]),                                                                   InlineKeyboardButton(text = list[i+1], callback_data = list[i+1]))
+        keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list[i]),InlineKeyboardButton(text = list[i+1], callback_data = list[i+1]))
       elif i % 2 == 0 and i == len(list) - 1:
         keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list[i]))
       else:
@@ -100,7 +132,7 @@ def keyboardForMethods(post):
   else:
     for i in range(len(list)):
       if i % 2 == 0 and i != len(list) - 1: 
-        keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]),                                                                   InlineKeyboardButton(text = list[i+1], callback_data = list_id[i+1]))
+        keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]),InlineKeyboardButton(text = list[i+1], callback_data = list_id[i+1]))
       elif i % 2 == 0 and i == len(list) - 1:
         keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]))
       else:
@@ -110,6 +142,7 @@ def keyboardForMethods(post):
 def keyboardForAddingBookmark():
   keyboard_inline = InlineKeyboardMarkup()
   keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = "Bookmark",callback_data = "add bookmark"))
+  keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = "Upvote", callback_data = "upvote"))
   return keyboard_inline
 
 def keyboardForSearchingBookmarks(id):
@@ -123,8 +156,8 @@ def keyboardForSearchingBookmarks(id):
         
 def keyboardForRemovingBookmarks(bookmarked_method):  
   keyboard_inline = InlineKeyboardMarkup()
-  keyboard_inline.add(InlineKeyboardButton(text = "Back to Bookmarks",callback_data = "display all bookmarks " + bookmarked_method))
   keyboard_inline.add(InlineKeyboardButton(text = "Remove Bookmark",callback_data = "removing bookmark " + bookmarked_method))
+  keyboard_inline.add(InlineKeyboardButton(text = "Back to Bookmarks",callback_data = "display all bookmarks " + bookmarked_method))
   return keyboard_inline   
 
 def keyboardForQuickSearchMethods(post, method):
@@ -142,16 +175,65 @@ def keyboardForQuickSearchMethods(post, method):
   else:
     for i in range(len(list)):
       if i % 2 == 0 and i != len(list) - 1: 
-        keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]),                                                                   InlineKeyboardButton(text = list[i+1], callback_data = list_id[i+1]))
+        keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]),InlineKeyboardButton(text = list[i+1], callback_data = list_id[i+1]))
       elif i % 2 == 0 and i == len(list) - 1:
         keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]))
       else:
         continue
-  return keyboard_inline  
+  return keyboard_inline
+
+
+
+def keyboardForUpvoted():
+  keyboard_inline = InlineKeyboardMarkup()
+  packages = db.list_collection_names()
+  for package in packages:
+    col = db[package]
+    cursor = col.find({})
+    for document in cursor:
+      try:
+        for i in range(len(document['classmethods'])):
+          if(document['classmethods'][i]['upvotes']) > 0:
+            keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = document['classmethods'][i]['method_modifier'],callback_data = "method_name"))#document['classmethods'][i]['method_modifier'][0]))  #need to show description of upvoted method
+      except KeyError:
+        continue
+      except IndexError:
+        continue
+  return keyboard_inline
+
+
+
+
+#########################
+######## START ##########
+#########################
+@bot.message_handler(commands = ['start','help'])
+def startMenu(message):
+  user_first_name = str(message.chat.first_name)
+  user_last_name = str(message.chat.last_name)
+  text = f"Hey {user_first_name} {user_last_name}!\nWelcome to teleMethods! Have the knowledge for the java packages at the palm of your hand!\n \n"
+  text += "Use /packages to choose from the packages available \n"
+  text += "Use /bookmarks to choose from your bookmarked methods \n"
+  text += "Use /quick to perform a quick search for a certain method \n"
+  text += "Use /upvote to check on upvoted methods by other users"
+  bot.send_message(message.chat.id,text)
+
+
+#################
+##### UPVOTE ####
+#################
+
+@bot.message_handler(commands = ['upvote'])
+def upvoteMenu(message):
+  user_first_name = str(message.chat.first_name)
+  user_last_name = str(message.chat.last_name)
+  text = f"Hey {user_first_name} {user_last_name}!\n"
+  text += "Here are the upvoted methods"
+  bot.send_message(message.chat.id,text,reply_markup = keyboardForUpvoted())
 
   
 #########################
-### QUERTYING METHODS ###
+### QUERYING METHODS  ###
 #########################
 
 @bot.message_handler(commands=['packages'])
@@ -166,35 +248,41 @@ def whichClass(call):
   
   @bot.callback_query_handler(func= isClass)
   def whichMethod(call):
-    posts = db[classname]
-    post = posts.find_one({"classname" : call.data})
-    bot.delete_message (call.message.chat.id, call.message.id)
-    bot.send_message(call.message.chat.id, "Which method?", reply_markup = keyboardForMethods(post))
+    try:
+      posts = db[classname]
+      post = posts.find_one({"classname" : call.data})
+      bot.delete_message (call.message.chat.id, call.message.id)
+      bot.send_message(call.message.chat.id, "Which method?", reply_markup = keyboardForMethods(post))
     
-    @bot.callback_query_handler(func= isMethod)
-    def methodDescription(call):
-      methods = post["classmethods"]
-      for method in methods:
-        if method["ID"] == call.data:
-          name = method["method_name"]
-          type = method["method_modifier"]
-          description = method["method_description"].replace("\n", "")
-          msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description
-          bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
+      @bot.callback_query_handler(func= isMethod)
+      def methodDescription(call):
+        methods = post["classmethods"]
+        for method in methods:
+          if method["ID"] == call.data:
+            name = method["method_name"]
+            type = method["method_modifier"]
+            description = method["method_description"].replace("\n", "")
+            msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description
+            bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
   
-      @bot.callback_query_handler(func = isAddBookmark)
-      def addBookmark(call):
-        users = db["Bookmark"]
-        if users.find_one({'chat_id' : call.message.chat.id}) != None:
-          existing = users.find_one({'chat_id' : call.message.chat.id})
-          existing = existing["Bookmarked_methods"] 
-        else:
-          existing = []  
-        existing.append({"method_name":name,"method_modifier": type, "method_description": description})
-        users.update_one({'chat_id': call.message.chat.id},{'$set': {"Bookmarked_methods":existing}}, upsert=True)
-        text = "Bookmark added!"
-        bot.send_message(call.message.chat.id,text)
+        @bot.callback_query_handler(func = isAddBookmark)
+        def addBookmark(call):
+          users = db["Bookmark"]
+          if users.find_one({'chat_id' : call.message.chat.id}) != None:
+            existing = users.find_one({'chat_id' : call.message.chat.id})
+            existing = existing["Bookmarked_methods"] 
+          else:
+            existing = []  
+          existing.append({"method_name":name,"method_modifier": type, "method_description": description})
+          users.update_one({'chat_id': call.message.chat.id},{'$set': {"Bookmarked_methods":existing}}, upsert=True)
+          text = "Bookmark added!"
+          bot.send_message(call.message.chat.id,text)
 
+    except Exception as e:
+      print(e)
+      text = "There are no methods in this class!"
+      bot.send_message(call.message.chat.id,text)
+      return text
 
 #################
 ### BOOKMARKS ###
