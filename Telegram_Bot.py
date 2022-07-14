@@ -278,7 +278,7 @@ def whichClass(call):
           text = "Bookmark added!"
           bot.send_message(call.message.chat.id,text)
 
-    except Exception as e:
+    except TypeError as e:
       print(e)
       text = "There are no methods in this class!"
       bot.send_message(call.message.chat.id,text)
