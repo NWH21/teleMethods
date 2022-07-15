@@ -258,7 +258,10 @@ def whichClass(call):
     global post
     post = posts.find_one({"classname" : call.data})
     bot.delete_message (call.message.chat.id, call.message.id)
-    bot.send_message(call.message.chat.id, "Which method?", reply_markup = keyboardForMethods(post))
+    if len(post["classmethods"]) == 0:
+      bot.send_message(call.message.chat.id, "There are no methods in this class")
+    else:  
+      bot.send_message(call.message.chat.id, "Which method?", reply_markup = keyboardForMethods(post))
     
 
     @bot.callback_query_handler(func= isMethod)
@@ -287,12 +290,7 @@ def whichClass(call):
         bot.send_message(call.message.chat.id,text)
 
      
-##
-##    except TypeError as e:
-##      print(e)
-##      text = "There are no methods in this class!"
-##      bot.send_message(call.message.chat.id,text)
-##      return text
+
 
       
 
