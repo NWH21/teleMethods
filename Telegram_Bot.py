@@ -248,22 +248,25 @@ def whichPackage(call):
 def whichClass(call):
   global package_name
   package_name = call.data
+  print(package_name)
   bot.delete_message (call.message.chat.id, call.message.id)
   bot.send_message(call.message.chat.id, "Which class?", reply_markup = keyboardForClasses(package_name))
   
   @bot.callback_query_handler(func= isClass)
   def whichMethod(call):
     posts = db[package_name]
+    global post
     post = posts.find_one({"classname" : call.data})
-    print(package_name)
     bot.delete_message (call.message.chat.id, call.message.id)
     bot.send_message(call.message.chat.id, "Which method?", reply_markup = keyboardForMethods(post))
-  
+    
+
     @bot.callback_query_handler(func= isMethod)
     def methodDescription(call):
       methods = post["classmethods"]
       for method in methods:
         if method["ID"] == call.data:
+          print(method["method_name"])
           name = method["method_name"]
           type = method["method_modifier"]
           description = method["method_description"].replace("\n", "")
