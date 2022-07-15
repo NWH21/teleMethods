@@ -49,6 +49,10 @@ response = requests.get(url)
 ### CALLBACK CHECKERS ###
 #########################
 
+
+def isBackToPackages(call):
+  return call.data == "back to packages"
+
 def isPackage(call):
   return "java." in call.data or "javax." in call.data
 
@@ -122,15 +126,11 @@ def keyboardForMethods(post):
   keyboard_inline = InlineKeyboardMarkup()
   list_id = []
   list = []
-  print(post)
   for methods in post["classmethods"]:
     methodname = methods["method_name"]
     methodname = re.sub("\([^()]*\)", "", methodname)
     list_id.append(methods["ID"]) 
     list.append(methodname)
-##  if len(list) == 0:
-##    keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = "No methods", callback_data =None))
-  
   for i in range(len(list)):
     if i % 2 == 0 and i != len(list) - 1: 
       keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = list[i], callback_data = list_id[i]),InlineKeyboardButton(text = list[i+1], callback_data = list_id[i+1]))
@@ -144,6 +144,7 @@ def keyboardForAddingBookmark():
   keyboard_inline = InlineKeyboardMarkup()
   keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = "Bookmark",callback_data = "add bookmark"))
   keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = "Upvote", callback_data = "upvote"))
+  keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = "Back to Packages",callback_data = "back to packages"))
   return keyboard_inline
 
 def keyboardForSearchingBookmarks(id):
@@ -183,8 +184,6 @@ def keyboardForQuickSearchMethods(post, method):
         continue
   return keyboard_inline
 
-
-
 def keyboardForUpvoted():
   keyboard_inline = InlineKeyboardMarkup()
   packages = db.list_collection_names()
@@ -205,9 +204,9 @@ def keyboardForUpvoted():
 
 
 
-#########################
-######## START ##########
-#########################
+#############
+### START ###
+#############
 @bot.message_handler(commands = ['start','help'])
 def startMenu(message):
   user_first_name = str(message.chat.first_name)
@@ -220,9 +219,9 @@ def startMenu(message):
   bot.send_message(message.chat.id,text)
 
 
-#################
-##### UPVOTE ####
-#################
+##############
+### UPVOTE ###
+##############
 
 @bot.message_handler(commands = ['upvote'])
 def upvoteMenu(message):
@@ -241,17 +240,22 @@ def upvoteMenu(message):
 def whichPackage(message):
   bot.send_message(message.chat.id, "Which package?",reply_markup = keyboardForPackages())
 
+@bot.callback_query_handler(func= isBackToPackages)
+def whichPackage(call):
+  bot.send_message(call.message.chat.id, "Which package?",reply_markup = keyboardForPackages())
+
 @bot.callback_query_handler(func= isPackage)
 def whichClass(call):
   package_name = call.data
+  print(package_name)
   bot.delete_message (call.message.chat.id, call.message.id)
   bot.send_message(call.message.chat.id, "Which class?", reply_markup = keyboardForClasses(package_name))
   
   @bot.callback_query_handler(func= isClass)
   def whichMethod(call):
-##    try:
-    print(package_name)
+  #package_name not updated in this part 
     posts = db[package_name]
+    #print(package_name)
     post = posts.find_one({"classname" : call.data})
     bot.delete_message (call.message.chat.id, call.message.id)
     bot.send_message(call.message.chat.id, "Which method?", reply_markup = keyboardForMethods(post))
@@ -266,6 +270,7 @@ def whichClass(call):
           description = method["method_description"].replace("\n", "")
           msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description
           bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
+          break
   
       @bot.callback_query_handler(func = isAddBookmark)
       def addBookmark(call):
@@ -275,10 +280,10 @@ def whichClass(call):
           existing = existing["Bookmarked_methods"] 
         else:
           existing = []  
-          existing.append({"method_name":name,"method_modifier": type, "method_description": description})
-          users.update_one({'chat_id': call.message.chat.id},{'$set': {"Bookmarked_methods":existing}}, upsert=True)
-          text = "Bookmark added!"
-          bot.send_message(call.message.chat.id,text)
+        existing.append({"method_name":name,"method_modifier": type, "method_description": description})
+        users.update_one({'chat_id': call.message.chat.id},{'$set': {"Bookmarked_methods":existing}}, upsert=True)
+        text = "Bookmark added!"
+        bot.send_message(call.message.chat.id,text)
 
      
 ##
