@@ -31,10 +31,7 @@ cmd = [{
   },
   { "command" :"quick",
     "description" : "performs quick search"
-  },
-  { "command" :"upvote",
-    "description" : "gives top 10 most upvoted methods by other users"
-    }]
+  }]
 cmd = json.dumps(cmd)
 url = url + str(cmd)
 response = requests.get(url)
@@ -201,8 +198,7 @@ def startMenu(message):
   text = f"Hey {user_first_name} {user_last_name}!\nWelcome to teleMethods! Have the knowledge for the java packages at the palm of your hand!\n \n"
   text += "Use /packages to choose from the packages available \n"
   text += "Use /bookmarks to choose from your bookmarked methods \n"
-  text += "Use /quick to perform a quick search for a certain method \n"
-  text += "Use /upvote to check on upvoted methods by other users"
+  text += "Use /quick to perform a quick search for a certain method "
   bot.send_message(message.chat.id,text)
 
 
@@ -266,12 +262,14 @@ def whichClass(call):
       
       @bot.callback_query_handler(func = isUpvote)
       def upvoteMethod(call):
+        global newList
         newList = class_["classmethods"]
         for method in newList:
           if method["ID"] == methodID:
             if call.message.chat.id not in method["upvotes"]:
               method["upvotes"].append(call.message.chat.id)
               package_collection.update_one({"classname" : class_["classname"]}, {"$set" : {"classmethods" : newList}}, upsert = True)
+    
               bot.send_message(call.message.chat.id, "Upvoted!")
             else:
               bot.send_message(call.message.chat.id, "Already upvoted!")
@@ -371,6 +369,7 @@ def displayQuickSearchMethod(message):
 
     @bot.callback_query_handler(func = isUpvote)
     def upvoteMethod(call):
+      global newList
       newList = class_["classmethods"]
       for method in newList:
         if method["ID"] == methodID:
@@ -381,9 +380,6 @@ def displayQuickSearchMethod(message):
           else:
             bot.send_message(call.message.chat.id, "Already upvoted!")
 
-##############
-### UPVOTE ###
-##############
 
 
 
