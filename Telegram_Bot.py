@@ -5,6 +5,7 @@ from pymongo import MongoClient
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import re
+import pandas as pd
 
 
 
@@ -35,9 +36,6 @@ cmd = [{
 cmd = json.dumps(cmd)
 url = url + str(cmd)
 response = requests.get(url)
-
-
-
 
 
 
@@ -218,7 +216,6 @@ def whichPackage(call):
 def whichClass(call):
   global package_name
   package_name = call.data
-  print(package_name)
   bot.delete_message (call.message.chat.id, call.message.id)
   bot.send_message(call.message.chat.id, "Which class?", reply_markup = keyboardForClasses(package_name))
   
@@ -236,16 +233,20 @@ def whichClass(call):
     @bot.callback_query_handler(func= isMethod)
     def methodDescription(call):
       global methodID
-      methodID = call.data
-      methods = class_["classmethods"]
-      for method in methods:
-        if method["ID"] == call.data:
-          name = method["method_name"]
-          type = method["method_modifier"]
-          description = method["method_description"].replace("\n", "")
-          upvotes = method["upvotes"]
-          msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description  + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
+      methodID = call.data 
+      count = 0
+      for methods in class_["classmethods"]:
+        if methods["ID"] == call.data:
+          name = methods["method_name"]
+          type = methods["method_modifier"]
+          upvotes = methods["upvotes"]
+          description = methods["method_description"].replace("\n", "")
+          new = class_["classmethods"]
+          new[count]["history"] = new[count]["history"] + 1
+          package_collection.update_one({"classname" : class_["classname"]}, {'$set' : {"classmethods" : new}})
+          msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
           bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
+      count += 1
       
       @bot.callback_query_handler(func = isAddBookmark)
       def addBookmark(call):
@@ -337,7 +338,7 @@ def displayQuickSearchMethod(message):
   package_collection = db[package]
   classname = text[-1].split()[0]
   method = text[-1].split()[1]
-  class_ = db[package].find_one({"classname" : classname})
+  class_ = package_collection.find_one({"classname" : classname})
   bot.send_message(message.chat.id, "Which method?", reply_markup = keyboardForQuickSearchMethods(class_, re.sub("\([^()]*\)", "", method)))
    
     
@@ -345,15 +346,20 @@ def displayQuickSearchMethod(message):
   def methodDescription(call):
     global methodID
     methodID = call.data 
+    count = 0
     for methods in class_["classmethods"]:
       if methods["ID"] == call.data:
         name = methods["method_name"]
         type = methods["method_modifier"]
         upvotes = methods["upvotes"]
         description = methods["method_description"].replace("\n", "")
+        new = class_["classmethods"]
+        new[count]["history"] = new[count]["history"] + 1
+        package_collection.update_one({"classname" : classname}, {'$set' : {"classmethods" : new}})
         msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
         bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
-  
+      count += 1
+
     @bot.callback_query_handler(func = isAddBookmark)
     def addBookmark(call):
       users = db["Bookmark"]
@@ -381,8 +387,43 @@ def displayQuickSearchMethod(message):
             bot.send_message(call.message.chat.id, "Already upvoted!")
 
 
+#####################
+###RECOMMENDATIONS###
+#####################
 
+'''
+import numpy as np
+import random
 
+#Can ask user which package and class he wants??
+java_time = db.java.time
+dictionary = pd.DataFrame(list(java_time.find()))
+df_methods = dictionary['classmethods']
+d = pd.DataFrame(data = df_methods[0],columns = ['ID','method_name','upvotes','history'])
+
+for i in range(15):
+  d['history'][i] = random.randint(0, 2)
+
+print(d)
+d_items = d.pivot_table(index = ['method_name'],columns = ['ID'],values = 'history').fillna(0)
+
+print(d_items)
+
+def get_recommendations(df, item):
+
+    
+    recommendations = df.corrwith(df[item])
+    recommendations.dropna(inplace=True)
+    recommendations = pd.DataFrame(recommendations, columns=['correlation']).reset_index(drop = True)
+    recommendations = recommendations.sort_values(by='correlation', ascending=False)
+    
+    return recommendations
+
+recommendations = get_recommendations(d_items, "i0")#here can put highest history
+print(recommendations[1:]["ID"])
+#print(recommendations[1:]['method_name'])
+#print(d.ID)
+'''
 
 
 bot.polling()
