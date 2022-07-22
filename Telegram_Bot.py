@@ -34,6 +34,9 @@ cmd = [{
   },
   { "command" :"quick",
     "description" : "performs quick search"
+  },
+  { "command" :"recommendation",
+    "description" : "suggests methods for use"
   }]
 cmd = json.dumps(cmd)
 url = url + str(cmd)
@@ -206,7 +209,8 @@ def startMenu(message):
   text = f"Hey {user_first_name} {user_last_name}!\nWelcome to teleMethods! Have the knowledge for the java packages at the palm of your hand!\n \n"
   text += "Use /packages to choose from the packages available \n"
   text += "Use /bookmarks to choose from your bookmarked methods \n"
-  text += "Use /quick to perform a quick search for a certain method "
+  text += "Use /quick to perform a quick search for a certain method \n"
+  text += "Use /recommendation for a list of suggested methods"
   bot.send_message(message.chat.id,text)
 
 
@@ -446,7 +450,7 @@ def recommendation(message):
     new[get_list_index(name, new)]["history"] = new[get_list_index(name, new)]["history"] + 1
 
     db[package_name].update_one({"classname" : classname}, {'$set' : {"classmethods" : new}})
-    msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
+    msg = "Package Name:" + package_name + "\n \nClass Name:" + classname + "\n \nMethod Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
     bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
 
     @bot.callback_query_handler(func = isAddBookmark)
