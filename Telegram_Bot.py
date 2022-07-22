@@ -5,6 +5,8 @@ from pymongo import MongoClient
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import re
+import pandas as pd
+import numpy as np
 
 
 
@@ -31,13 +33,13 @@ cmd = [{
   },
   { "command" :"quick",
     "description" : "performs quick search"
+  },
+  { "command" :"recommendation",
+    "description" : "suggests methods for use"
   }]
 cmd = json.dumps(cmd)
 url = url + str(cmd)
 response = requests.get(url)
-
-
-
 
 
 
@@ -58,7 +60,7 @@ def isClass(call):
   return string[0].isupper() and not isBookmark(call)
 
 def isMethod(call):
-  return not isPackage(call) and not isClass(call) and not isBookmark(call) and call.data != "upvote"
+  return not isPackage(call) and not isClass(call) and not isBookmark(call) and call.data != "upvote" and not isRecommendation(call)
 
 def isBookmark(call):
   return "bookmark" in call.data
@@ -91,6 +93,9 @@ def isQuickSearch(message):
 
 def isUpvote(call):
   return call.data == "upvote"
+
+def isRecommendation(call):
+  return "recommendation " in call.data
   
 #################
 ### KEYBOARDS ###
@@ -184,8 +189,13 @@ def keyboardForQuickSearchMethods(post, method):
         continue
   return keyboard_inline
 
-
-
+def keyboardForRecommendation(data):
+  df = pd.read_json(data, orient='columns')
+  keyboard_inline = InlineKeyboardMarkup()
+  for i in df.index.tolist():
+    method = df.loc[i]
+    keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = method["method_name"], callback_data = "recommendation " + str(i)))
+  return keyboard_inline
 
 #############
 ### START ###
@@ -198,7 +208,8 @@ def startMenu(message):
   text = f"Hey {user_first_name} {user_last_name}!\nWelcome to teleMethods! Have the knowledge for the java packages at the palm of your hand!\n \n"
   text += "Use /packages to choose from the packages available \n"
   text += "Use /bookmarks to choose from your bookmarked methods \n"
-  text += "Use /quick to perform a quick search for a certain method "
+  text += "Use /quick to perform a quick search for a certain method \n"
+  text += "Use /recommendation for a list of suggested methods"
   bot.send_message(message.chat.id,text)
 
 
@@ -218,7 +229,6 @@ def whichPackage(call):
 def whichClass(call):
   global package_name
   package_name = call.data
-  print(package_name)
   bot.delete_message (call.message.chat.id, call.message.id)
   bot.send_message(call.message.chat.id, "Which class?", reply_markup = keyboardForClasses(package_name))
   
@@ -236,16 +246,20 @@ def whichClass(call):
     @bot.callback_query_handler(func= isMethod)
     def methodDescription(call):
       global methodID
-      methodID = call.data
-      methods = class_["classmethods"]
-      for method in methods:
-        if method["ID"] == call.data:
-          name = method["method_name"]
-          type = method["method_modifier"]
-          description = method["method_description"].replace("\n", "")
-          upvotes = method["upvotes"]
-          msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description  + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
+      methodID = call.data 
+      count = 0
+      for methods in class_["classmethods"]:
+        if methods["ID"] == call.data:
+          name = methods["method_name"]
+          type = methods["method_modifier"]
+          upvotes = methods["upvotes"]
+          description = methods["method_description"].replace("\n", "")
+          new = class_["classmethods"]
+          new[count]["history"] = new[count]["history"] + 1
+          package_collection.update_one({"classname" : class_["classname"]}, {'$set' : {"classmethods" : new}})
+          msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
           bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
+      count += 1
       
       @bot.callback_query_handler(func = isAddBookmark)
       def addBookmark(call):
@@ -337,7 +351,7 @@ def displayQuickSearchMethod(message):
   package_collection = db[package]
   classname = text[-1].split()[0]
   method = text[-1].split()[1]
-  class_ = db[package].find_one({"classname" : classname})
+  class_ = package_collection.find_one({"classname" : classname})
   bot.send_message(message.chat.id, "Which method?", reply_markup = keyboardForQuickSearchMethods(class_, re.sub("\([^()]*\)", "", method)))
    
     
@@ -345,15 +359,20 @@ def displayQuickSearchMethod(message):
   def methodDescription(call):
     global methodID
     methodID = call.data 
+    count = 0
     for methods in class_["classmethods"]:
       if methods["ID"] == call.data:
         name = methods["method_name"]
         type = methods["method_modifier"]
         upvotes = methods["upvotes"]
         description = methods["method_description"].replace("\n", "")
+        new = class_["classmethods"]
+        new[count]["history"] = new[count]["history"] + 1
+        package_collection.update_one({"classname" : classname}, {'$set' : {"classmethods" : new}})
         msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
         bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
-  
+      count += 1
+
     @bot.callback_query_handler(func = isAddBookmark)
     def addBookmark(call):
       users = db["Bookmark"]
@@ -381,9 +400,97 @@ def displayQuickSearchMethod(message):
             bot.send_message(call.message.chat.id, "Already upvoted!")
 
 
+#######################
+### RECOMMENDATIONS ###
+#######################
 
+@bot.message_handler(commands = ['recommendation'])
+def recommendation(message):
+  collection_names = db.list_collection_names()
+  collection_names.remove("Bookmark")
+  finaldf = pd.DataFrame()
+  
+  for collection in collection_names:
+    package = db[collection]
+    package_df = pd.DataFrame(list(package.find()))
+    df = pd.DataFrame() 
+    for index in list(package_df.index):
+      class_df = pd.DataFrame(data = package_df['classmethods'][index],columns = ['ID','method_name', 'method_modifier', 'method_description', 'upvotes','history'])
+      class_df["class_name"] = package_df.at[index, "classname"]
+      df = df.append(class_df)
+    df["package_name"] = collection
+    finaldf = finaldf.append(df)
 
+  finaldf = finaldf.reset_index(drop = True)
+  finaldf = finaldf.loc[finaldf['history'] >= 1]
+  finaldf["ID"] = finaldf.index.tolist()
+  history_series = finaldf["history"]
+  largest_history_id = pd.to_numeric(history_series).idxmax()
+  d_items = pd.DataFrame(np.diag(finaldf["history"]), index = finaldf.index ,columns = history_series.index).fillna(0)
 
+  recommendations_list= get_recommendations(d_items, largest_history_id)
+  finaldf = finaldf[finaldf.index.isin(recommendations_list[:5])]
+  bot.send_message(message.chat.id, "Which method?", reply_markup = keyboardForRecommendation(finaldf.to_json()))
+
+  @bot.callback_query_handler(func = isRecommendation)
+  def method_description(call):
+    index = int(call.data.replace("recommendation ", ""))
+    methods = finaldf.loc[index]
+    global package_name
+    package_name = methods["package_name"]
+    classname = methods["class_name"]
+    class_ = db[package_name].find_one({"classname" : classname})
+    name = methods["method_name"]
+    type = methods["method_modifier"]
+    upvotes = methods["upvotes"]
+    description = methods["method_description"].replace("\n", "")
+
+    new = class_["classmethods"]
+    new[get_list_index(name, new)]["history"] = new[get_list_index(name, new)]["history"] + 1
+
+    db[package_name].update_one({"classname" : classname}, {'$set' : {"classmethods" : new}})
+    msg = "Package Name:" + package_name + "\n \nClass Name:" + classname + "\n \nMethod Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
+    bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
+
+    @bot.callback_query_handler(func = isAddBookmark)
+    def addBookmark(call):
+      users = db["Bookmark"]
+      if users.find_one({'chat_id' : call.message.chat.id}) != None:
+        existing = users.find_one({'chat_id' : call.message.chat.id})
+        existing = existing["Bookmarked_methods"] 
+      else:
+        existing = []  
+      existing.append({"method_name":name,"method_modifier": type, "method_description": description})
+      users.update_one({'chat_id': call.message.chat.id},{'$set': {"Bookmarked_methods":existing}}, upsert=True)
+      text = "Bookmark added!"
+      bot.send_message(call.message.chat.id,text)  
+
+    @bot.callback_query_handler(func = isUpvote)
+    def upvoteMethod(call):
+      global newList
+      newList = class_["classmethods"]
+      for method in newList:
+        if method["method_name"] == name:
+          if call.message.chat.id not in method["upvotes"]:
+            method["upvotes"].append(call.message.chat.id)
+            db[package_name].update_one({"classname" : class_["classname"]}, {"$set" : {"classmethods" : newList}}, upsert = True)
+            bot.send_message(call.message.chat.id, "Upvoted!")
+          else:
+            bot.send_message(call.message.chat.id, "Already upvoted!")
+
+def get_recommendations(df, item):
+    recommendations = df.corrwith(df[item])
+    recommendations.dropna(inplace=True)
+    recommendations = pd.DataFrame(recommendations, columns=['correlation'])
+    recommendations = recommendations.sort_values(by='correlation', ascending=False)
+    return recommendations.index.tolist()
+
+def get_list_index(method_name, classmethods):
+  count = 0
+  for method in classmethods:
+    if method["method_name"] == method_name:
+      return count
+    count += 1
 
 bot.polling()
 
