@@ -6,6 +6,8 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import re
 import pandas as pd
+import numpy as np
+import random
 
 
 
@@ -56,7 +58,7 @@ def isClass(call):
   return string[0].isupper() and not isBookmark(call)
 
 def isMethod(call):
-  return not isPackage(call) and not isClass(call) and not isBookmark(call) and call.data != "upvote"
+  return not isPackage(call) and not isClass(call) and not isBookmark(call) and call.data != "upvote" and not isRecommendation(call)
 
 def isBookmark(call):
   return "bookmark" in call.data
@@ -89,6 +91,9 @@ def isQuickSearch(message):
 
 def isUpvote(call):
   return call.data == "upvote"
+
+def isRecommendation(call):
+  return "recommendation " in call.data
   
 #################
 ### KEYBOARDS ###
@@ -182,8 +187,13 @@ def keyboardForQuickSearchMethods(post, method):
         continue
   return keyboard_inline
 
-
-
+def keyboardForRecommendation(data):
+  df = pd.read_json(data, orient='columns')
+  keyboard_inline = InlineKeyboardMarkup()
+  for i in df.index.tolist():
+    method = df.loc[i]
+    keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = method["method_name"], callback_data = "recommendation " + str(i)))
+  return keyboard_inline
 
 #############
 ### START ###
@@ -387,44 +397,97 @@ def displayQuickSearchMethod(message):
             bot.send_message(call.message.chat.id, "Already upvoted!")
 
 
-#####################
-###RECOMMENDATIONS###
-#####################
+#######################
+### RECOMMENDATIONS ###
+#######################
 
-'''
-import numpy as np
-import random
+@bot.message_handler(commands = ['recommendation'])
+def recommendation(message):
+  collection_names = db.list_collection_names()
+  collection_names.remove("Bookmark")
+  finaldf = pd.DataFrame()
+  
+  for collection in collection_names:
+    package = db[collection]
+    package_df = pd.DataFrame(list(package.find()))
+    df = pd.DataFrame() 
+    for index in list(package_df.index):
+      class_df = pd.DataFrame(data = package_df['classmethods'][index],columns = ['ID','method_name', 'method_modifier', 'method_description', 'upvotes','history'])
+      class_df["class_name"] = package_df.at[index, "classname"]
+      df = df.append(class_df)
+    df["package_name"] = collection
+    finaldf = finaldf.append(df)
 
-#Can ask user which package and class he wants??
-java_time = db.java.time
-dictionary = pd.DataFrame(list(java_time.find()))
-df_methods = dictionary['classmethods']
-d = pd.DataFrame(data = df_methods[0],columns = ['ID','method_name','upvotes','history'])
+  finaldf = finaldf.reset_index(drop = True)
+  finaldf = finaldf.loc[finaldf['history'] >= 1]
+  finaldf["ID"] = finaldf.index.tolist()
+  history_series = finaldf["history"]
+  largest_history_id = pd.to_numeric(history_series).idxmax()
+  d_items = pd.DataFrame(np.diag(finaldf["history"]), index = finaldf.index ,columns = history_series.index).fillna(0)
 
-for i in range(15):
-  d['history'][i] = random.randint(0, 2)
+  recommendations_list= get_recommendations(d_items, largest_history_id)
+  finaldf = finaldf[finaldf.index.isin(recommendations_list[:5])]
+  bot.send_message(message.chat.id, "Which method?", reply_markup = keyboardForRecommendation(finaldf.to_json()))
 
-print(d)
-d_items = d.pivot_table(index = ['method_name'],columns = ['ID'],values = 'history').fillna(0)
+  @bot.callback_query_handler(func = isRecommendation)
+  def method_description(call):
+    index = int(call.data.replace("recommendation ", ""))
+    methods = finaldf.loc[index]
+    global package_name
+    package_name = methods["package_name"]
+    classname = methods["class_name"]
+    class_ = db[package_name].find_one({"classname" : classname})
+    name = methods["method_name"]
+    type = methods["method_modifier"]
+    upvotes = methods["upvotes"]
+    description = methods["method_description"].replace("\n", "")
 
-print(d_items)
+    new = class_["classmethods"]
+    new[get_list_index(name, new)]["history"] = new[get_list_index(name, new)]["history"] + 1
+
+    db[package_name].update_one({"classname" : classname}, {'$set' : {"classmethods" : new}})
+    msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
+    bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
+
+    @bot.callback_query_handler(func = isAddBookmark)
+    def addBookmark(call):
+      users = db["Bookmark"]
+      if users.find_one({'chat_id' : call.message.chat.id}) != None:
+        existing = users.find_one({'chat_id' : call.message.chat.id})
+        existing = existing["Bookmarked_methods"] 
+      else:
+        existing = []  
+      existing.append({"method_name":name,"method_modifier": type, "method_description": description})
+      users.update_one({'chat_id': call.message.chat.id},{'$set': {"Bookmarked_methods":existing}}, upsert=True)
+      text = "Bookmark added!"
+      bot.send_message(call.message.chat.id,text)  
+
+    @bot.callback_query_handler(func = isUpvote)
+    def upvoteMethod(call):
+      global newList
+      newList = class_["classmethods"]
+      for method in newList:
+        if method["method_name"] == name:
+          if call.message.chat.id not in method["upvotes"]:
+            method["upvotes"].append(call.message.chat.id)
+            db[package_name].update_one({"classname" : class_["classname"]}, {"$set" : {"classmethods" : newList}}, upsert = True)
+            bot.send_message(call.message.chat.id, "Upvoted!")
+          else:
+            bot.send_message(call.message.chat.id, "Already upvoted!")
 
 def get_recommendations(df, item):
-
-    
     recommendations = df.corrwith(df[item])
     recommendations.dropna(inplace=True)
-    recommendations = pd.DataFrame(recommendations, columns=['correlation']).reset_index(drop = True)
+    recommendations = pd.DataFrame(recommendations, columns=['correlation'])
     recommendations = recommendations.sort_values(by='correlation', ascending=False)
-    
-    return recommendations
+    return recommendations.index.tolist()
 
-recommendations = get_recommendations(d_items, "i0")#here can put highest history
-print(recommendations[1:]["ID"])
-#print(recommendations[1:]['method_name'])
-#print(d.ID)
-'''
-
+def get_list_index(method_name, classmethods):
+  count = 0
+  for method in classmethods:
+    if method["method_name"] == method_name:
+      return count
+    count += 1
 
 bot.polling()
 
