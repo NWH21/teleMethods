@@ -10,6 +10,7 @@ import numpy as np
 
 
 
+
 client = pymongo.MongoClient("mongodb+srv://kkennyllow:Something1.@cluster0.nmjspdx.mongodb.net/teleMethods?retryWrites=true&w=majority")
 db = client["teleMethods"]
 API_KEY = "5424123226:AAG2yTG5kdgMwfk6vyOMr7DYQ3fTkMhNFbs"
@@ -194,7 +195,7 @@ def keyboardForRecommendation(data):
   keyboard_inline = InlineKeyboardMarkup()
   for i in df.index.tolist():
     method = df.loc[i]
-    keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = method["method_name"], callback_data = "recommendation " + str(i)))
+    keyboard_inline = keyboard_inline.add(InlineKeyboardButton(text = method["package_name"]+"."+method["class_name"] + "." +method["method_name"], callback_data = "recommendation " + str(i)))
   return keyboard_inline
 
 #############
