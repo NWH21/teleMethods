@@ -410,6 +410,7 @@ def recommendation(message):
   collection_names = db.list_collection_names()
   collection_names.remove("Bookmark")
   finaldf = pd.DataFrame()
+  bot.send_message(message.chat.id, "Generating Recommendations...")
   
   for collection in collection_names:
     package = db[collection]
