@@ -442,6 +442,7 @@ def recommendation(message):
     package_name = methods["package_name"]
     classname = methods["class_name"]
     class_ = db[package_name].find_one({"classname" : classname})
+    global name
     name = methods["method_name"]
     type = methods["method_modifier"]
     upvotes = methods["upvotes"]
