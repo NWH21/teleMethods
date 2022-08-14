@@ -92,6 +92,9 @@ def isQuickSearch(message):
         return True
   return False
 
+def isNotQuickSearch(message):
+  return not isQuickSearch(message)
+
 def isUpvote(call):
   return call.data == "upvote"
 
@@ -251,6 +254,10 @@ def whichClass(call):
       count = 0
       for methods in class_["classmethods"]:
         if methods["ID"] == call.data:
+          global name
+          global type
+          global upvotes
+          global description
           name = methods["method_name"]
           type = methods["method_modifier"]
           upvotes = methods["upvotes"]
@@ -342,9 +349,12 @@ def returnToBookmarks(call):
   
 @bot.message_handler(commands = ['quick'])
 def quickSearch(message):
-  bot.send_message(message.chat.id, "What are you searching for?")
-  bot.send_message(message.chat.id, "Try it in this format 'java.util.Optional orElse'")
- 
+  bot.send_message(message.chat.id, "What are you searching for?" + "\n" + "Please try it in this format 'java.util.Optional orElse'")
+
+@bot.message_handler(func = isNotQuickSearch)
+def wrongQuickSearch(message):
+  bot.send_message(message.chat.id, "Invalid Search" + "\n" + "Please try again with this format 'java.util.Optional orElse' or check if there are spelling errors.")
+
 @bot.message_handler(func = isQuickSearch)
 def displayQuickSearchMethod(message):
   text = message.text.split(".")
@@ -356,7 +366,7 @@ def displayQuickSearchMethod(message):
   class_ = package_collection.find_one({"classname" : classname})
   bot.send_message(message.chat.id, "Which method?", reply_markup = keyboardForQuickSearchMethods(class_, re.sub("\([^()]*\)", "", method)))
   
-   
+  
     
   @bot.callback_query_handler(func= isMethod)
   def methodDescription(call):
@@ -365,6 +375,10 @@ def displayQuickSearchMethod(message):
     count = 0
     for methods in class_["classmethods"]:
       if methods["ID"] == call.data:
+        global name
+        global type
+        global upvotes
+        global description
         name = methods["method_name"]
         type = methods["method_modifier"]
         upvotes = methods["upvotes"]
