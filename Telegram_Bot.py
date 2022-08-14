@@ -251,6 +251,10 @@ def whichClass(call):
       count = 0
       for methods in class_["classmethods"]:
         if methods["ID"] == call.data:
+          global name
+          global type
+          global upvotes
+          global description
           name = methods["method_name"]
           type = methods["method_modifier"]
           upvotes = methods["upvotes"]
