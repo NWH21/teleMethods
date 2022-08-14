@@ -372,11 +372,7 @@ def displayQuickSearchMethod(message):
         package_collection.update_one({"classname" : classname}, {'$set' : {"classmethods" : new}})
         msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
         bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
-        count += 1
-      else:
-        text = "Whoops, looks like you searched it wrongly. Do try to search it in this format 'java.util.Optional orElse'."
-        bot.send_message(call.message.chat.id,text)
-   
+      count += 1
       
 
     @bot.callback_query_handler(func = isAddBookmark)
