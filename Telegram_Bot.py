@@ -377,7 +377,6 @@ def displayQuickSearchMethod(message):
 
     @bot.callback_query_handler(func = isAddBookmark)
     def addBookmark(call):
-      global users
       users = db["Bookmark"]
       if users.find_one({'chat_id' : call.message.chat.id}) != None:
         existing = users.find_one({'chat_id' : call.message.chat.id})
@@ -459,7 +458,6 @@ def recommendation(message):
 
     @bot.callback_query_handler(func = isAddBookmark)
     def addBookmark(call):
-      global users
       users = db["Bookmark"]
       if users.find_one({'chat_id' : call.message.chat.id}) != None:
         existing = users.find_one({'chat_id' : call.message.chat.id})
