@@ -251,10 +251,6 @@ def whichClass(call):
       count = 0
       for methods in class_["classmethods"]:
         if methods["ID"] == call.data:
-          global name
-          global type
-          global upvotes
-          global description
           name = methods["method_name"]
           type = methods["method_modifier"]
           upvotes = methods["upvotes"]
@@ -347,17 +343,19 @@ def returnToBookmarks(call):
 @bot.message_handler(commands = ['quick'])
 def quickSearch(message):
   bot.send_message(message.chat.id, "What are you searching for?")
+  bot.send_message(message.chat.id, "Try it in this format 'java.util.Optional orElse'")
  
 @bot.message_handler(func = isQuickSearch)
 def displayQuickSearchMethod(message):
-  
   text = message.text.split(".")
   package = message.text.replace("." + text[-1],"")
   package_collection = db[package]
   classname = text[-1].split()[0]
   method = text[-1].split()[1]
+  global class_
   class_ = package_collection.find_one({"classname" : classname})
   bot.send_message(message.chat.id, "Which method?", reply_markup = keyboardForQuickSearchMethods(class_, re.sub("\([^()]*\)", "", method)))
+  
    
     
   @bot.callback_query_handler(func= isMethod)
@@ -377,7 +375,6 @@ def displayQuickSearchMethod(message):
         msg = "Method Name: " + name + "\n" + "\n" + "Method Modifier: " + type + "\n" + "\n" + "Method Description: " + description + "\n" + "\n" + "Number of Upvotes: " + str(len(upvotes))
         bot.send_message(call.message.chat.id, msg, reply_markup = keyboardForAddingBookmark())
       count += 1
-      
 
     @bot.callback_query_handler(func = isAddBookmark)
     def addBookmark(call):
@@ -415,7 +412,6 @@ def recommendation(message):
   collection_names = db.list_collection_names()
   collection_names.remove("Bookmark")
   finaldf = pd.DataFrame()
-  bot.send_message(message.chat.id, "Generating Recommendations...")
   
   for collection in collection_names:
     package = db[collection]
@@ -447,7 +443,6 @@ def recommendation(message):
     package_name = methods["package_name"]
     classname = methods["class_name"]
     class_ = db[package_name].find_one({"classname" : classname})
-    global name
     name = methods["method_name"]
     type = methods["method_modifier"]
     upvotes = methods["upvotes"]
